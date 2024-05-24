@@ -320,7 +320,7 @@
 
     const onSuccess = async (token) => {
       setIsSubmitBtnDisabled(false);
-      window.ReactNativeWebView.postMessage(token);
+      window.ReactNativeWebView.postMessage(`${token} ${cvv}`);
     }
 
     const gatherErrors = (paymentForm, clearErrorsOnly) => {
