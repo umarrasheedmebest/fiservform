@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<style>
+    .loader {
+        border: 5px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 5px solid blue;
+        border-bottom: 5px solid blue;
+        width: 20px;
+        height: 20px;
+        -webkit-animation: spin 2s linear infinite;
+        animation: spin 2s linear infinite;
+        margin-left: 45%;
+        margin-right: 25%;
+        margin-top: 20px;
+    }
+
+    .errorMessage {
+        color: red;
+        margin: 0 0 0 6px;
+    }
+
+    .btn {
+        height: 50px;
+        border-radius: 5px;
+        font-size: 20px;
+    }
+
+    .fieldLoading::after {
+        background: linear-gradient(90deg,
+        transparent,
+        rgba(0, 0, 0, 0.24),
+        transparent);
+    }
+
+    .field {
+        border: solid 1px #9fa6b9;
+        margin: 0 0 2px;
+        border-radius: 5px;
+        overflow: hidden;
+        padding: 15px 8px 5px;
+        position: relative;
+    }
+
+    .cvvField {
+        border: solid 1px #9fa6b9;
+        margin: 0 0 2px;
+        border-radius: 5px;
+        overflow: hidden;
+        padding: 10px 8px 3px;
+        position: relative;
+    }
+
+    .field>div {
+        height: 20px;
+    }
+
+    .fieldContainer {
+        z-index: 2;
+        position: relative;
+        width: 100%;
+        margin-bottom: 4px;
+    }
+
+    .cvvTextField {
+        height: 18px;
+        font-size: 20px;
+    '& .MuiInput-underline:before, & .MuiInput-underline:after': {
+        display: none;
+    }
+    }
+
+    /*removed to make all fields behave consistently*/
+    /*.field>div.validClass:not(.emptyClass)~label>span,*/
+    /*.field>div.invalidClass:not(.emptyClass)~label>span,*/
+    /*.field>div.focusClass~label>span {*/
+    /*    top: 2px;*/
+    /*    font-size: 14px;*/
+    /*}*/
+
+    .field.invalidClass:not(.optional)~label>span {
+        color: red !important;
+    }
+
+    /* Safari */
+    @-webkit-keyframes spin {
+        0% {
+            -webkit-transform: rotate(0deg);
+        }
+
+        100% {
+            -webkit-transform: rotate(360deg);
+        }
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+
+<body>
+<div id="payment_form"></div>
+<script type="text/babel">
+  const { TextField, Button, Grid, Skeleton, Alert, Typography } = MaterialUI;
+  const cvvValidRegex = /^[0-9]{3,4}$/i;
+  const cvvErrorMessage = 'Please enter 3 or 4 digits on back of card';
+  const FiservForm = () => {
+    const [paymentForm, setPaymentForm] = React.useState(null);
+    const formRef = React.useRef();
+    const [errors, setErrors] = React.useState({});
+    const [clientToken, setClientToken] = React.useState(null);
+    const [publicKeyBase64, setPublicKeyBase64] = React.useState(null);
+    const [isSubmitBtnDisabled, setIsSubmitBtnDisabled] =
+      React.useState(false);
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const buttonName = urlParams.get("screen");
+    const platform = urlParams.get('platform');
+    const [cvv, setCvv] = React.useState('')
+    //toggles a selector to match the UI with the fiserv form fields
+    const [showSelector, setShowSelector] = React.useState(false);
+
+
+    const fiservTokenizationConfig = {
+      // optional
+      styles: {
+        ".emptyClass": {
+          "font-size": "20px",
+          color: "#444",
+        },
+
+        ".focusClass": {
+          "font-size": "20px",
+        },
+
+        ".invalidClass": {
+          color: "black",
+          "font-size": "20px",
+        },
+
+        ".validClass": {
+          color: "#444",
+          "font-size": "20px",
+        },
+      },
+
+      // optional
+      classes: {
+        empty: "emptyClass",
+        focus: "focusClass",
+        invalid: "invalidClass",
+        valid: "validClass",
+      },
+
+      fields: {
+        card: {
+          selector: "[data-cc-card]",
+
+          // optional
+          placeholder: "",
+
+          // optional, defaults to all brands being allowed
+          // see section titled "Restrict Card Brands" below for more information
+          allowedBrands: [
+            "visa",
+            "discover",
+            "mastercard",
+            "american-express",
+          ],
+        },
+
+        name: {
+          selector: "[data-cc-name]",
+
+          // optional
+          placeholder: "",
+        },
+
+        exp: {
+          selector: "[data-cc-exp]",
+
+          // optional
+          placeholder: "",
+        },
+
+        // optional but required for successful zero dollar auth
+        // cvv: {
+        //   selector: "[data-cc-cvv]",
+        //
+        //   // optional
+        //   placeholder: "",
+        // },
+
+        address1: {
+          selector: "#cc-address1-container",
+
+          // optional
+          placeholder: "",
+        },
+
+        // optional
+        // address2: {
+        //     selector: '#cc-address2-container',
+        //
+        //     // optional
+        //     placeholder: '',
+        // },
+
+        // optional
+        city: {
+          selector: "#cc-city-container",
+
+          // optional
+          placeholder: "",
+        },
+
+        // optional
+        postalCode: {
+          selector: "#cc-postal-code-container",
+
+          // optional
+          placeholder: "",
+        },
+
+        // optional
+        region: {
+          selector: "#cc-region-container",
+
+          // optional
+          placeholder: "",
+        },
+      },
+    };
+
+    //load payment js first data
+    React.useEffect(() => {
+      const paymentJsEnv = urlParams.get("env");
+      const script = document.createElement("script");
+      script.src = `https://lib.paymentjs.firstdata.com/${paymentJsEnv}/client-2.0.0.js`;
+      script.async = true;
+      script.onload = () => {
+        //when the script has been successfully loaded show the payment form
+        setClientToken(urlParams.get("clientToken"));
+        setPublicKeyBase64(urlParams.get("publicKeyBase64"));
+      }
+      document.body.appendChild(script);
+    }, []);
+
+    React.useEffect(() => {
+      if (showSelector) {
+        setTimeout(() => {
+          setShowSelector(false);
+        }, 100)
+      }
+    }, [showSelector]);
+
+    // fiserv form dynamically
+    React.useEffect(() => {
+      if (publicKeyBase64 && clientToken && !paymentForm) {
+        // After auth success and when paymentForm has not been set, use API to create a paymentForm
+        window.firstdata.createPaymentForm(
+          fiservTokenizationConfig,
+          fiservTokenizationHooks({ clientToken, publicKeyBase64 }),
+          (paymentForm) => {
+            setPaymentForm(paymentForm);
+          }
+        );
+      }
+    }, [clientToken, publicKeyBase64]);
+
+    const handleCvvChange = (e) => {
+      const cvv = e.target.value.replace(/[^0-9]/, '').substr(0,4);
+      setCvv(cvv);
+      if (cvvValidRegex.test(cvv)) {
+        delete errors.cvv;
+        setErrors({
+          ...errors
+        })
+      }
+    }
+
+
+    const onSubmit = async () => {
+      const isValid = await validate(paymentForm);
+      if (!isValid) {
+        return;
+      }
+      setIsSubmitBtnDisabled(true);
+      try {
+        paymentForm.validate(
+          () => {
+            paymentForm.authenticate(
+              (auth) => {
+                paymentForm.submit(auth, onSuccess, onError);
+              },
+              onError,
+            );
+          },
+          onError,
+        );
+      } catch (error) {
+        if (onError) {
+          await onError(error);
+        } else {
+          throw error;
+        }
+      }
+    };
+
+    const onError = async (error) => {
+      setIsSubmitBtnDisabled(false);
+      window.ReactNativeWebView.postMessage(`error: ${error}`);
+    }
+
+    const onSuccess = async (token) => {
+      setIsSubmitBtnDisabled(false);
+      window.ReactNativeWebView.postMessage(token);
+    }
+
+    const gatherErrors = (paymentForm, clearErrorsOnly) => {
+      return new Promise((resolve) => {
+        paymentForm.getState((data) => {
+          const newErrors = errors;
+
+          for (const [key] of Object.entries(newErrors)) {
+            if (data[key].valid) {
+              delete newErrors[key];
+            }
+          }
+
+          if (clearErrorsOnly) {
+            resolve(newErrors);
+            return;
+          }
+
+          resolve({
+            ...newErrors,
+            ...(!data.card.valid && { card: 'Please enter a valid card number' }),
+            ...(!data.name.valid && { name: 'Please enter your full name' }),
+            ...(!cvvValidRegex.test(cvv) && {cvv: cvvErrorMessage}),
+            ...(!data.exp.valid && { exp: 'Please enter a valid expiration date' }),
+            ...(!data.address1.valid && { address1: 'Please enter a valid address' }),
+            ...(!data.city.valid && { city: 'Please enter a valid city' }),
+            ...((!data.region.valid || parseInt(data.region.length) !== 2) &&
+              { region: 'Please enter a valid 2-letter state abbreviation' }),
+            ...((!data.postalCode.valid || parseInt(data.postalCode.length) !== 5) &&
+              { postalCode: 'Please enter a valid 5-digit ZIP code' }),
+          });
+        });
+      })
+    }
+
+
+    const validate = async (paymentForm, clearErrorsOnly = false) => {
+      const errors = await gatherErrors(paymentForm, clearErrorsOnly);
+      setErrors(errors);
+      return Object.keys(errors).length <= 0;
+    }
+
+
+    const fiservTokenizationHooks = ({ clientToken, publicKeyBase64 }) => {
+      return {
+        // required
+        preFlowHook: (callbackFn) => {
+          // values come from authorize-session endpoint
+          callbackFn({
+            clientToken,
+            publicKeyBase64,
+          });
+        },
+
+        // optional, alternate method of providing address field data
+        // see target gateway documentation on how this data should be formatted
+        // such as what country codes are accepted.
+        // submitFormHook: (callbackFn) => {
+        //     callbackFn({
+        //         address1: "...",  // optional
+        //         address2: "...",  // optional
+        //         city: "...",      // optional
+        //         company: "...",   // optional
+        //         country: "...",   // optional
+        //         postalCode: "...",// optional
+        //         region: "...",    // optional
+        //     });
+        // },
+      };
+    };
+
+    const handleLabelClick = (field) => {
+      paymentForm.setFieldFocus(field, () => { });
+    };
+
+    return (
+      <>
+        <form ref={formRef} id="form">
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant={"h6"} component={"h2"}>
+                Payment details
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <div className={"field"}>
+                <div data-cc-name/>
+                <label
+                  onClick={() => handleLabelClick("name")}
+                  htmlFor="first-data-payment-field-name"
+                >
+                  <span>{paymentForm ? "Name on card" : "Loading..."}</span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              {errors?.name ? <p className={"errorMessage"}>{errors.name}</p>: null}
+            </Grid>
+            <Grid item xs={12}>
+              <div className={"field"}>
+                <div data-cc-card/>
+                <label htmlFor="first-data-payment-field-card">
+                  <span>{paymentForm ? "Card number" : "Loading..."}</span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              <p className={"errorMessage"}>{errors?.card}</p>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <div className={"cvvField"}>
+                <div className={"fieldContainer"}>
+                  <TextField
+                    onClick={()=> {
+                      //safari shows a selector animation when a filed is pressed on the fiserv form
+                      //the emulates that for ios
+                      if (platform === 'ios') {
+                        setShowSelector(true);
+                      }
+                    }
+                    }
+                    className={"cvvTextField"}
+                    id={'cvv-field'}
+                    value={cvv}
+                    onChange={handleCvvChange}
+                    fullWidth={true}
+                    variant="standard"
+                    inputProps={{
+                      inputMode: 'decimal'
+                    }}
+                    InputProps={{
+                      disableUnderline: true,
+                      style: {fontSize: 20,
+                        fontFamily: "Arial, Helvetica, sans-serif",
+                        position: 'absolute',
+                        height: 22,
+                        backgroundColor: showSelector ? '#cbcbcb' : "#ffffff",
+                        borderRadius: 6,
+                      },
+                    }}
+                  />
+                </div>
+                <label htmlFor="cvv-field" className={`fieldLoading`}><span>{paymentForm ? 'CVV' : 'Loading...'}</span></label>
+                {!paymentForm && <Skeleton className={'fieldLoading'} animation="wave" />}
+              </div>
+              {errors?.cvv && (
+                <p className={'errorMessage'}>{errors?.cvv}</p>
+              )}
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <div className={"field"}>
+                <div data-cc-exp/>
+                <label htmlFor="first-data-payment-field-exp">
+                  <span>{paymentForm ? "Expiration" : "Loading..."}</span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              <p className={"errorMessage"}>{errors?.exp}</p>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant={"h6"} component={"h2"}>
+                Billing details
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <div className={"field"}>
+                <div id={"cc-address1-container"}/>
+                <label
+                  onClick={() => handleLabelClick("address1")}
+                  htmlFor="first-data-payment-field-address1"
+                >
+                    <span>
+                      {paymentForm ? "Street address" : "Loading..."}
+                    </span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              <p className={"errorMessage"}>{errors?.address1}</p>
+            </Grid>
+            <Grid item xs={12}>
+              <div className={"field"}>
+                <div id={"cc-city-container"}/>
+                <label
+                  onClick={() => handleLabelClick("city")}
+                  htmlFor="first-data-payment-field-city"
+                >
+                  <span>{paymentForm ? "City" : "Loading..."}</span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              <p className={"errorMessage"}>{errors?.city}</p>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <div className={"field"}>
+                <div id={"cc-region-container"}/>
+                <label
+                  onClick={() => handleLabelClick("region")}
+                  htmlFor="first-data-payment-field-region"
+                >
+                  <span>{paymentForm ? "State" : "Loading..."}</span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              <p className={"errorMessage"}>{errors?.region}</p>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <div className={"field"}>
+                <div id={"cc-postal-code-container"}/>
+                <label
+                  onClick={() => handleLabelClick("postalCode")}
+                  htmlFor="first-data-payment-field-postalCode"
+                >
+                  <span>{paymentForm ? "ZIP code" : "Loading..."}</span>
+                </label>
+                {!paymentForm && (
+                  <Skeleton className={"fieldLoading"} animation="wave"/>
+                )}
+              </div>
+              <p className={"errorMessage"}>{errors?.postalCode}</p>
+            </Grid>
+
+            {Object.keys(errors).length > 0 && (
+              <Grid item xs={12}>
+                <Alert severity={"error"}>
+                  There is an error on your form. Please correct any errors
+                  and resubmit.
+                </Alert>
+              </Grid>
+            )}
+
+            <Grid item xs={12} sm={6}>
+              {isSubmitBtnDisabled ? (
+                <div className="loader"></div>
+              ) : (
+                <Button
+                  style={{backgroundColor: "#592163"}}
+                  variant={"contained"}
+                  onClick={onSubmit}
+                  fullWidth={true}
+                  size={"large"}
+                  className="btn"
+                >
+                  {buttonName && buttonName === "checkout"
+                    ? "Submit Order"
+                    : "Next"}
+                </Button>
+              )}
+            </Grid>
+          </Grid>
+        </form>
+      </>
+    );
+  };
+
+  const container = document.getElementById("payment_form");
+  const root = ReactDOM.createRoot(container);
+  root.render(<FiservForm/>);
+</script>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0"/>
+    <!-- Load our React component. -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Load Payment js -->
+    <script src="https://lib.paymentjs.firstdata.com/uat/client-2.0.0.js"></script>
+
+    <!-- MUI -->
+    <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js"
+            crossorigin="anonymous"></script>
+
+    <!-- axios -->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <!-- Fonts to support Material Design -->
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"/>
+    <!-- Icons to support Material Design -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"/>
+</head>
+</body>
+
+</html>
