@@ -290,7 +290,6 @@
       const onSubmit = async () => {
         const isValid = await validate(paymentForm);
         if (!isValid) {
-          const revalidate = await validate(paymentForm, true);
           return;
         }
         setIsSubmitBtnDisabled(true);
