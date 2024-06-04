@@ -340,6 +340,7 @@
     const onSubmit = async () => {
       let isValid = await validate(paymentForm);
       if (!isValid) {
+      // setErrors(await gatherErrors({paymentForm}));
         return;
       }
       setIsSubmitBtnDisabled(true);
@@ -376,7 +377,7 @@
 
  const validate = async ({paymentForm, clearErrorsOnly = false}) => {
         const errors = await gatherErrors({paymentForm, clearErrorsOnly});
-        setFormErrors(errors);
+        setErrors(errors);
         return Object.keys(errors).length <= 0;
     }
 
