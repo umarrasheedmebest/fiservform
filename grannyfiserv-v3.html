@@ -236,43 +236,6 @@
       },
     };
 
-    
-    const gatherErrors = (paymentForm, clearErrorsOnly) => {
-      return new Promise((resolve) => {
-        paymentForm.getState((data) => {
-          const newErrors = errors;
-
-    for (const [key] of Object.entries(newErrors)) {
-                    if (key !== 'cvv' && data[key].valid) {
-                        delete newErrors[key];
-                    }
-                    if (key === 'cvv' && cvvValidRegex.test(cvv)) {
-                        delete newErrors[key];
-                    }
-                }
-
-          if (clearErrorsOnly) {
-            resolve(newErrors);
-            return;
-          }
-
-          resolve({
-            ...newErrors,
-            ...(!data.card.valid && { card: 'Please enter a valid card number' }),
-            ...(!data.name.valid && { name: 'Please enter your full name' }),
-            ...(!cvvValidRegex.test(cvv) && {cvv: cvvErrorMessage}),
-            ...(!data.exp.valid && { exp: 'Please enter a valid expiration date' }),
-            ...(!data.address1.valid && { address1: 'Please enter a valid address' }),
-            ...(!data.city.valid && { city: 'Please enter a valid city' }),
-            ...((!data.region.valid || parseInt(data.region.length) !== 2) &&
-              { region: 'Please enter a valid 2-letter state abbreviation' }),
-            ...((!data.postalCode.valid || parseInt(data.postalCode.length) !== 5) &&
-              { postalCode: 'Please enter a valid 5-digit ZIP code' }),
-          });
-        });
-      })
-    }
-
     //load payment js first data
     React.useEffect(() => {
       const paymentJsEnv = urlParams.get("env");
@@ -408,6 +371,43 @@
         // },
       };
     };
+
+       const gatherErrors = (paymentForm, clearErrorsOnly) => {
+      return new Promise((resolve) => {
+        paymentForm.getState((data) => {
+          const newErrors = errors;
+
+    for (const [key] of Object.entries(newErrors)) {
+                    if (key !== 'cvv' && data[key].valid) {
+                        delete newErrors[key];
+                    }
+                    if (key === 'cvv' && cvvValidRegex.test(cvv)) {
+                        delete newErrors[key];
+                    }
+                }
+
+          if (clearErrorsOnly) {
+            resolve(newErrors);
+            return;
+          }
+
+          resolve({
+            ...newErrors,
+            ...(!data.card.valid && { card: 'Please enter a valid card number' }),
+            ...(!data.name.valid && { name: 'Please enter your full name' }),
+            ...(!cvvValidRegex.test(cvv) && {cvv: cvvErrorMessage}),
+            ...(!data.exp.valid && { exp: 'Please enter a valid expiration date' }),
+            ...(!data.address1.valid && { address1: 'Please enter a valid address' }),
+            ...(!data.city.valid && { city: 'Please enter a valid city' }),
+            ...((!data.region.valid || parseInt(data.region.length) !== 2) &&
+              { region: 'Please enter a valid 2-letter state abbreviation' }),
+            ...((!data.postalCode.valid || parseInt(data.postalCode.length) !== 5) &&
+              { postalCode: 'Please enter a valid 5-digit ZIP code' }),
+          });
+        });
+      })
+    }
+
 
     const handleLabelClick = (field) => {
       paymentForm.setFieldFocus(field, () => { });
