@@ -329,12 +329,15 @@
       return new Promise((resolve) => {
         paymentForm.getState((data) => {
           const newErrors = errors;
-
+          
           for (const [key] of Object.entries(newErrors)) {
-            if (data[key].valid) {
-              delete newErrors[key];
+            if (key !== 'cvv' && data[key].valid) {
+                delete newErrors[key];
             }
-          }
+            if (key === 'cvv' && cvvValidRegex.test(cvv)) {
+                delete newErrors[key];
+            }
+        }
 
           if (clearErrorsOnly) {
             resolve(newErrors);
