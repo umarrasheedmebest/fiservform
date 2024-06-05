@@ -4,8 +4,8 @@
   .loader {
     border: 5px solid #f3f3f3;
     border-radius: 50%;
-    border-top: 5px solid blue;
-    border-bottom: 5px solid blue;
+    border-top: 5px solid #592163;
+    border-bottom: 5px solid #592163;
     width: 20px;
     height: 20px;
     -webkit-animation: spin 2s linear infinite;
@@ -121,11 +121,13 @@
         React.useState(false);
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
-      const platform = urlParams.get('platform');
       const buttonName = urlParams.get("screen");
+      const platform = urlParams.get('platform');
       const [cvv, setCvv] = React.useState('')
       //toggles a selector to match the UI with the fiserv form fields
       const [showSelector, setShowSelector] = React.useState(false);
+
+
       const fiservTokenizationConfig = {
         // optional
         styles: {
@@ -164,7 +166,7 @@
             // optional
             placeholder: "",
 
-            // optional, defaults to all brands being allowed.
+            // optional, defaults to all brands being allowed
             // see section titled "Restrict Card Brands" below for more information
             allowedBrands: [
               "visa",
@@ -284,8 +286,9 @@
         }
       }
 
+
       const onSubmit = async () => {
-        let isValid = await validate(paymentForm);
+        const isValid = await validate(paymentForm);
         if (!isValid) {
           return;
         }
@@ -313,18 +316,12 @@
 
       const onError = async (error) => {
         setIsSubmitBtnDisabled(false);
-        window.ReactNativeWebView.postMessage(`fiserv payment form error===>${error.toString()}`);
+        window.ReactNativeWebView.postMessage(`error: ${error}`);
       }
 
       const onSuccess = async (token) => {
         setIsSubmitBtnDisabled(false);
         window.ReactNativeWebView.postMessage(`${token} ${cvv}`);
-      }
-
-      const validate = async (paymentForm) => {
-        const errors = await gatherErrors(paymentForm, false);
-        setErrors(errors);
-        return Object.keys(errors).length <= 0;
       }
 
       const gatherErrors = (paymentForm, clearErrorsOnly) => {
@@ -363,6 +360,14 @@
         })
       }
 
+
+      const validate = async (paymentForm, clearErrorsOnly = false) => {
+        const errors = await gatherErrors(paymentForm, clearErrorsOnly);
+        setErrors(errors);
+        return Object.keys(errors).length <= 0;
+      }
+
+
       const fiservTokenizationHooks = ({ clientToken, publicKeyBase64 }) => {
         return {
           // required
@@ -394,6 +399,7 @@
       const handleLabelClick = (field) => {
         paymentForm.setFieldFocus(field, () => { });
       };
+
       return (
         <>
           <form ref={formRef} id="form">
@@ -416,7 +422,7 @@
                     <Skeleton className={"fieldLoading"} animation="wave" />
                   )}
                 </div>
-                <p className={"errorMessage"}>{errors?.name}</p>
+                {errors?.name ? <p className={"errorMessage"}>{errors.name}</p> : null}
               </Grid>
               <Grid item xs={12}>
                 <div className={"field"}>
@@ -472,7 +478,6 @@
                   <p className={'errorMessage'}>{errors?.cvv}</p>
                 )}
               </Grid>
-
               <Grid item xs={12} sm={6}>
                 <div className={"field"}>
                   <div data-cc-exp />
@@ -571,13 +576,11 @@
                     style={{ backgroundColor: "#592163" }}
                     variant={"contained"}
                     onClick={onSubmit}
-                    // type={"submit"}
-                    // id="submit"
                     fullWidth={true}
                     size={"large"}
                     className="btn"
                   >
-                  {buttonName && buttonName === "checkout"
+                    {buttonName && buttonName === "checkout"
                       ? "Submit Order"
                       : "Next"}
                   </Button>
@@ -588,6 +591,7 @@
         </>
       );
     };
+
     const container = document.getElementById("payment_form");
     const root = ReactDOM.createRoot(container);
     root.render(<FiservForm />);
